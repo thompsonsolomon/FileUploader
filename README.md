@@ -37,7 +37,7 @@ src/
 └── server.js
 ⚙️ Installation
 1. Clone the repo
-git clone https://github.com/yourusername/media-upload-api.git
+git clone https://github.com/thompsonsolomon/FileUploader/
 cd media-upload-api
 2. Install dependencies
 npm install
