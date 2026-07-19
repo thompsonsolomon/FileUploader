@@ -6,17 +6,20 @@ const cloudinary = require("../config/cloudinary");
 const getResourceType = require("../utils/getResourceType");
 
 const uploadFile = async (req, res) => {
-
   try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: "No file uploaded",
+      });
+    }
 
     const resourceType = getResourceType(req.file.mimetype);
 
     let finalBuffer = req.file.buffer;
 
-    // ================= IMAGE PROCESSING =================
-
+    // Optimize images only
     if (resourceType === "image") {
-
       finalBuffer = await sharp(req.file.buffer)
         .resize({
           width: 1400,
@@ -28,13 +31,64 @@ const uploadFile = async (req, res) => {
         .toBuffer();
     }
 
-    // ================= FILE INFO =================
-
     const originalName = path.parse(req.file.originalname).name;
+
+    // Keep only safe filename characters
+    const safeName = originalName
+      .replace(/[^\w\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-");
 
     const extension = path.extname(req.file.originalname).replace(".", "");
 
-    // ================= CLOUDINARY UPLOAD =================
+    const options = {
+      folder: smartdev_uploads/${resourceType},
+      resource_type: resourceType,
+      use_filename: false,
+      unique_filename: false,
+      overwrite: false,
+      public_id:
+        resourceType === "image"
+          ? ${Date.now()}
+          : ${Date.now()}-${safeName},
+    };
+
+    // Only images should force a format
+    if (resourceType === "image") {
+      options.format = "webp";
+    }
+
+    const result = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        options,
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        }
+      );
+
+      streamifier.createReadStream(finalBuffer).pipe(uploadStream);
+    });
+
+    console.log("Cloudinary Upload:", result);
+
+    return res.status(200).json({
+      success: true,
+      url: result.secure_url,
+      public_id: result.public_id,
+      resource_type: result.resource_type,
+      format: result.format,
+      original_name: req.file.originalname,
+    });
+  } catch (err) {
+    console.error("Upload Error:", err);
+
+    return res.status(500).json({
+      success: false,
+      error: err.message || "Upload failed",
+    });
+  }
+};    // ================= CLOUDINARY UPLOAD =================
 
     const result = await new Promise((resolve, reject) => {
 
